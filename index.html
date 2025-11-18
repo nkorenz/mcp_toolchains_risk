@@ -3,608 +3,845 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compositional Risk Analysis in MCP Toolchain Networks</title>
+    <title>MCP Toolchain Risk Analyzer | Compositional Security Research</title>
+    
+    <!-- Libraries -->
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script>
-        window.MathJax = {
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']]
-            }
-        };
-    </script>
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg-dark: #0f172a;
+            --bg-panel: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+            
+            /* Semantic Colors */
+            --c-agent: #a855f7;    /* Purple */
+            --c-data: #3b82f6;     /* Blue */
+            --c-tool: #10b981;     /* Green */
+            --c-actuator: #f97316; /* Orange */
+            --c-attack: #ef4444;   /* Red */
+            --c-highlight: #facc15; /* Yellow */
         }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif;
-            background-color: #0F172A;
-            color: #F8FAFC;
-            line-height: 1.6;
-            min-height: 100vh;
-            padding: 40px 20px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            height: 100vh;
+            width: 100vw;
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            overflow: hidden;
         }
 
-        .paper-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background-color: #1E293B;
-            border-radius: 8px;
-            padding: 40px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-        }
-
-        .figure-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .figure-number {
-            font-size: 18px;
-            font-weight: bold;
-            color: #3B82F6;
-            margin-bottom: 10px;
-        }
-
-        .figure-title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #F8FAFC;
-            margin-bottom: 15px;
-        }
-
-        .figure-subtitle {
-            font-size: 16px;
-            color: #94A3B8;
-            font-style: italic;
-        }
-
-        .diagram-container {
-            position: relative;
-            height: 600px;
-            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-            border: 2px solid #374151;
-            border-radius: 8px;
-            margin-bottom: 30px;
-        }
-
-        #mcpNetwork {
-            width: 100%;
-            height: 100%;
-            border-radius: 6px;
-        }
-
-        .formula-overlay {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(30, 41, 59, 0.95);
-            border: 1px solid #3B82F6;
-            border-radius: 8px;
-            padding: 15px;
-            font-size: 14px;
-            backdrop-filter: blur(5px);
-            max-width: 280px;
-        }
-
-        .formula-title {
-            color: #3B82F6;
-            font-weight: bold;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-
-        .risk-metrics {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(30, 41, 59, 0.95);
-            border: 1px solid #10B981;
-            border-radius: 8px;
-            padding: 15px;
-            font-size: 12px;
-            backdrop-filter: blur(5px);
-            min-width: 200px;
-        }
-
-        .risk-metrics h4 {
-            color: #10B981;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-
-        .risk-item {
+        /* SIDEBAR CONTROLS */
+        aside {
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            padding: 24px;
             display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
-            font-family: 'Courier New', monospace;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            z-index: 20;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.3);
         }
 
-        .risk-low { color: #10B981; }
-        .risk-medium { color: #F59E0B; }
-        .risk-high { color: #EF4444; }
+        h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; color: #fff; }
+        h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 10px; font-weight: 600; }
+        .subtitle { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px; }
 
-        .legend-overlay {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(30, 41, 59, 0.95);
-            border: 1px solid #8B5CF6;
-            border-radius: 8px;
-            padding: 15px;
-            font-size: 12px;
-            backdrop-filter: blur(5px);
-            min-width: 200px;
-        }
-
-        .legend-title {
-            color: #8B5CF6;
-            font-weight: bold;
-            margin-bottom: 10px;
-            text-align: center;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin: 8px 0;
-        }
-
-        .legend-icon {
-            width: 20px;
-            height: 20px;
-            margin-right: 10px;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .attack-indicator {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid #EF4444;
-            border-radius: 8px;
-            padding: 15px;
-            font-size: 12px;
-            backdrop-filter: blur(5px);
-            min-width: 250px;
-            display: none;
-        }
-
-        .attack-indicator.active {
-            display: block;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-
-        .controls {
-            text-align: center;
-            margin: 20px 0;
-        }
-
-        .btn {
-            background: #3B82F6;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            margin: 5px;
+        /* SCENARIO BUTTONS */
+        .scenario-selector { display: flex; flex-direction: column; gap: 8px; }
+        .btn-scenario {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 12px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s ease;
+            text-align: left;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .btn-scenario:hover { background: rgba(255,255,255,0.08); border-color: var(--text-secondary); }
+        .btn-scenario.active {
+            border-color: var(--c-agent);
+            background: rgba(168, 85, 247, 0.1);
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.1);
+        }
+        .btn-scenario i { color: var(--text-secondary); width: 20px; text-align: center; }
+        .btn-scenario.active i { color: var(--c-agent); }
+
+        /* METRICS PANEL */
+        .metrics-panel {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid var(--border);
+        }
+        .metric-row {
+            display: flex; justify-content: space-between;
+            font-family: 'Courier New', monospace; font-size: 13px;
+            margin-bottom: 8px; padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .metric-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .val-risk { color: var(--c-attack); font-weight: bold; }
+        .val-cef { color: var(--c-tool); font-weight: bold; }
+
+        /* INFO BUTTON */
+        .btn-info {
+            background: transparent; color: var(--c-data); border: 1px solid var(--c-data);
+            padding: 8px; border-radius: 4px; cursor: pointer; font-size: 12px;
+            margin-top: 10px; width: 100%; text-align: center; font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-info:hover { background: rgba(59, 130, 246, 0.1); box-shadow: 0 0 10px rgba(59, 130, 246, 0.2); }
+
+        /* FOOTER */
+        .footer {
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .footer a { color: var(--text-secondary); text-decoration: none; display: block; margin-bottom: 4px; }
+        .footer a:hover { color: var(--c-agent); text-decoration: underline; }
+
+        /* MAIN CANVAS AREA */
+        main {
+            position: relative;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            overflow: hidden;
+            height: 100%;
         }
 
-        .btn:hover {
-            background: #2563EB;
-            transform: translateY(-1px);
+        #network-viz { width: 100%; height: 100%; }
+
+        /* ATTACK TOGGLE */
+        .attack-toggle {
+            background: var(--c-attack); color: white; border: none; padding: 12px;
+            border-radius: 6px; font-weight: 600; cursor: pointer;
+            display: flex; justify-content: center; gap: 8px; width: 100%;
+            transition: transform 0.1s;
+        }
+        .attack-toggle:hover { filter: brightness(1.1); }
+        .attack-toggle:active { transform: scale(0.98); }
+        .attack-toggle.active { box-shadow: 0 0 20px rgba(239, 68, 68, 0.4); animation: pulse 2s infinite; }
+
+        /* OVERLAYS */
+        .legend {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(15, 23, 42, 0.9); padding: 16px;
+            border-radius: 8px; border: 1px solid var(--border);
+            font-size: 12px; backdrop-filter: blur(4px); pointer-events: none; z-index: 5;
+        }
+        .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        /* ATTACK CARD */
+        .attack-card {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(150%);
+            width: 90%; max-width: 600px;
+            background: rgba(15, 23, 42, 0.98); border: 1px solid var(--c-attack); border-left: 4px solid var(--c-attack);
+            padding: 24px; border-radius: 8px;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6); z-index: 30;
+        }
+        .attack-card.visible { transform: translateX(-50%) translateY(0); }
+        .attack-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .badge { background: rgba(239, 68, 68, 0.2); color: var(--c-attack); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; font-family: monospace; }
+        .chain-steps { display: flex; gap: 8px; align-items: center; margin: 16px 0; font-size: 12px; font-family: monospace; color: var(--text-secondary); flex-wrap: wrap; }
+        .step-arrow { color: var(--border); }
+
+        /* CUSTOM TOOLTIP */
+        #custom-tooltip {
+            position: absolute; display: none;
+            background: rgba(30, 41, 59, 0.95); border: 1px solid var(--border);
+            padding: 12px; border-radius: 6px; pointer-events: none;
+            font-size: 12px; max-width: 250px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+        #custom-tooltip h4 { color: var(--c-agent); margin-bottom: 4px; font-size: 13px; }
+        #custom-tooltip p { color: var(--text-secondary); margin: 0; line-height: 1.4; }
+
+        /* METHODOLOGY MODAL (SLIDE DECK) */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 1000;
+            display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(8px);
+        }
+        .modal-overlay.open { display: flex; }
+        
+        .modal {
+            background: var(--bg-panel); width: 800px; max-width: 90%; height: 500px;
+            border-radius: 12px; border: 1px solid var(--border);
+            position: relative; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
-        .btn.danger {
-            background: #EF4444;
+        .modal-header {
+            padding: 20px 30px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(15, 23, 42, 0.5);
+        }
+        .modal-title { color: #fff; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; transition: color 0.2s; }
+        .modal-close:hover { color: #fff; }
+
+        .modal-body { flex: 1; position: relative; padding: 0; overflow: hidden; }
+        
+        .slide { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            padding: 40px; opacity: 0; transform: translateX(20px); transition: all 0.3s ease;
+            pointer-events: none; overflow-y: auto;
+        }
+        .slide.active { opacity: 1; transform: translateX(0); pointer-events: auto; }
+
+        .slide h3 { color: var(--c-highlight); font-size: 20px; margin-bottom: 16px; }
+        .slide p { font-size: 15px; line-height: 1.7; color: var(--text-secondary); margin-bottom: 16px; }
+        .slide strong { color: var(--text-primary); font-weight: 600; }
+
+        .callout { background: rgba(59, 130, 246, 0.1); border-left: 3px solid var(--c-data); padding: 16px; border-radius: 0 6px 6px 0; margin: 20px 0; font-size: 14px; }
+        .formula-box { background: rgba(0,0,0,0.3); border: 1px solid var(--border); padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0; }
+        
+        .modal-footer {
+            padding: 16px 30px; border-top: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(15, 23, 42, 0.5);
         }
 
-        .btn.danger:hover {
-            background: #DC2626;
+        .pagination-dots { display: flex; gap: 6px; }
+        .dot-nav { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 0.2s; }
+        .dot-nav.active { background: var(--c-agent); }
+        
+        .nav-btn {
+            background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-primary);
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600;
+            transition: all 0.2s; display: flex; align-items: center; gap: 8px;
         }
+        .nav-btn:hover { background: var(--border); }
+        .nav-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .nav-btn.primary { background: var(--c-agent); border-color: var(--c-agent); color: #fff; }
+        .nav-btn.primary:hover { filter: brightness(1.1); }
 
-        .figure-caption {
-            font-size: 14px;
-            color: #94A3B8;
-            line-height: 1.5;
-            margin-top: 20px;
-            text-align: justify;
-        }
+        /* TABLE STYLES */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 20px 0; }
+        .data-table th { text-align: left; padding: 12px; border-bottom: 1px solid var(--border); color: var(--c-highlight); text-transform: uppercase; font-size: 11px; }
+        .data-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary); }
+        .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+        .tag.crit { background: rgba(239, 68, 68, 0.2); color: var(--c-attack); }
 
-        .platform-icon {
-            font-size: 16px !important;
-        }
-
-        /* Custom node styling for platforms */
-        .vis-network .vis-manipulation {
-            display: none;
-        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
-    <div class="paper-container">
-        <div class="figure-header">
-            <div class="figure-number">Figure 1</div>
-            <div class="figure-title">Compositional Risk Analysis in MCP Toolchain Networks</div>
-            <div class="figure-subtitle">Interactive Visualization of Attack Surface Amplification in Enterprise AI Agent Deployments</div>
+
+    <!-- Sidebar -->
+    <aside>
+        <div>
+            <h1>MCP Toolchain Risk</h1>
+            <p class="subtitle">Modeling compositional risk in AI Agent toolchains using Graph Theory & Combinatorial Analysis.</p>
+            <button class="btn-info" onclick="app.toggleModal(true)">
+                <i class="fas fa-book-open"></i> Read Research Methodology
+            </button>
         </div>
 
-        <div class="diagram-container">
-            <div id="mcpNetwork"></div>
+        <div class="scenario-selector">
+            <h2>1. Select Topology</h2>
+            <div class="btn-scenario active" onclick="app.loadScenario(1)">
+                <i class="fas fa-cube"></i>
+                <div>
+                    <strong>Baseline (1 Server)</strong><br>
+                    <small>Filesystem + Agent</small>
+                </div>
+            </div>
+            <div class="btn-scenario" onclick="app.loadScenario(3)">
+                <i class="fas fa-cubes"></i>
+                <div>
+                    <strong>Compound (3 Servers)</strong><br>
+                    <small>ServiceNow + Supabase + Slack</small>
+                </div>
+            </div>
+            <div class="btn-scenario" onclick="app.loadScenario(6)">
+                <i class="fas fa-network-wired"></i>
+                <div>
+                    <strong>Enterprise (6 Servers)</strong><br>
+                    <small>Full Toolchain Integration</small>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h2>2. Combinational Exposure</h2>
+            <div class="metrics-panel">
+                <div style="margin-bottom: 12px; font-size: 14px; text-align: center; color: var(--text-secondary);">
+                    $$ \mathrm{CEF} = \sum_{L=1}^{L_{\max}} \beta^{L-1} \sum_{c \in \mathcal{C}_L} w_c $$
+                </div>
+                <div class="metric-row">
+                    <span>Amplifier (β):</span>
+                    <span>1.35</span>
+                </div>
+                <div class="metric-row">
+                    <span>Active Chains (N):</span>
+                    <span id="ui-chains">1</span>
+                </div>
+                <div class="metric-row">
+                    <span>CEF Score:</span>
+                    <span id="ui-cef" class="val-cef">0.12</span>
+                </div>
+                <div class="metric-row" style="margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top:8px;">
+                    <span>Prob. Compromise:</span>
+                    <span id="ui-risk" class="val-risk">9%</span>
+                </div>
+            </div>
+            <button class="attack-toggle" id="btn-attack" onclick="app.toggleAttack()" style="margin-top:16px;">
+                <i class="fas fa-biohazard"></i>
+                <span>SIMULATE EXPLOIT CHAIN</span>
+            </button>
+        </div>
+
+        <div class="footer">
+            <h2>References</h2>
+            <a href="https://jfrog.com/blog/2025-6514-critical-mcp-remote-rce-vulnerability/#resources" target="_blank" rel="noopener noreferrer"><i class="fas fa-external-link-alt"></i> CVE-2025-6514 Analysis</a>
+            <a href="https://jfrog.com/blog/2025-6514-critical-mcp-remote-rce-vulnerability/#resources" target="_blank" rel="noopener noreferrer"><i class="fas fa-external-link-alt"></i> CVE-2025-53109 Analysis</a>
+            <a href="https://jfrog.com/blog/2025-6514-critical-mcp-remote-rce-vulnerability/#resources" target="_blank" rel="noopener noreferrer"><i class="fas fa-external-link-alt"></i> Supabase MCP Lethal Trifecta</a>
+            <p style="margin-top: 8px; opacity: 0.5;">Niron Koren, Zenity Labs</p>
+        </div>
+    </aside>
+
+    <!-- Main Visualization -->
+    <main>
+        <div id="network-viz"></div>
+        <div id="custom-tooltip"></div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background:var(--c-agent)"></div> Agent (Orchestrator)</div>
+            <div class="legend-item"><div class="dot" style="background:var(--c-data)"></div> Data Source (Read)</div>
+            <div class="legend-item"><div class="dot" style="background:var(--c-tool)"></div> Tool (Transform)</div>
+            <div class="legend-item"><div class="dot" style="background:var(--c-actuator)"></div> Actuator (Write)</div>
+        </div>
+
+        <!-- Attack Details Overlay -->
+        <div id="attack-card" class="attack-card">
+            <div class="attack-header">
+                <h3 style="color: var(--c-attack); font-size: 16px;"><i class="fas fa-bug"></i> Active Exploitation Path</h3>
+                <span id="ac-cve" class="badge">CVE-XXXX-YYYY</span>
+            </div>
+            <p id="ac-desc" style="font-size: 14px; line-height: 1.6; margin-bottom: 12px; color: #e2e8f0;">
+                Description of the attack goes here.
+            </p>
+            <div class="chain-steps" id="ac-steps">
+                <!-- Steps injected via JS -->
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); border-top: 1px solid var(--border); padding-top: 12px; display: flex; justify-content: space-between;">
+                <span>Chain Length (L): <strong style="color: var(--text-primary)" id="ac-len">0</strong></span>
+                <span>Amplified Weight (w<sub>amp</sub>): <strong style="color: var(--c-attack)" id="ac-weight">0.00</strong></span>
+            </div>
+        </div>
+    </main>
+
+    <!-- Methodology Modal (Paginated Slide Deck) -->
+    <div id="modal-methodology" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-layer-group"></i> Research Methodology</div>
+                <button class="modal-close" onclick="app.toggleModal(false)">&times;</button>
+            </div>
             
-            <div class="formula-overlay">
-                <div class="formula-title">Combinational Exposure Factor</div>
-                <div style="text-align: center; margin: 10px 0;">
-                    $$\text{CEF} = \sum_{L=1}^{L_{\max}} \beta^{L-1} \sum_{c \in \mathcal{C}_L} w_c$$
+            <div class="modal-body">
+                <!-- Slide 1: The Thesis -->
+                <div class="slide active" data-step="1">
+                    <h3>1. The Compositional Risk Thesis</h3>
+                    <p>Traditional security assessments fail in MCP ecosystems because they treat risks as <strong>additive</strong>. In AI agent deployments, risk is <strong>multiplicative</strong>.</p>
+                    <p>An AI Agent does not use tools in isolation. It dynamically chains them together (e.g., "Read File" → "Format Data" → "Send Slack"). Each new MCP server doesn't just add one capability; it adds exponentially more possible execution paths.</p>
+                    <div class="callout">
+                        <i class="fas fa-exclamation-triangle"></i> <strong>Key Insight:</strong> With 1 MCP server, you have limited paths. With 3 servers, risk jumps from 9% → 52% because the number of valid toolchains explodes combinatorially.
+                    </div>
                 </div>
-                <div style="font-size: 11px; color: #94A3B8;">
-                    Where:<br>
-                    • $L$ = chain length<br>
-                    • $\beta$ = synergy coefficient<br>
-                    • $\mathcal{C}_L$ = chains of length $L$<br>
-                    • $w_c$ = chain weight
+
+                <!-- Slide 2: Graph Model -->
+                <div class="slide" data-step="2">
+                    <h3>2. Modeling Directed Multigraphs</h3>
+                    <p>We model every MCP deployment as a directed graph where:</p>
+                    <ul style="margin-left: 20px; line-height: 1.8; color: var(--text-secondary);">
+                        <li><strong style="color: var(--c-data)">Nodes</strong> are Data Sources, Tools, or Actuators.</li>
+                        <li><strong style="color: var(--c-dim)">Edges</strong> are potential data flows or tool invocations.</li>
+                        <li><strong style="color: var(--c-agent)">Toolchains</strong> are directed walks from data → action.</li>
+                    </ul>
+                    <p style="margin-top: 16px;">The AI Agent acts as the <strong>Graph Orchestrator</strong>, finding paths through this graph that system designers often overlook.</p>
+                </div>
+
+                <!-- Slide 3: The Math (CEF) -->
+                <div class="slide" data-step="3">
+                    <h3>3. Quantifying Risk: The CEF Formula</h3>
+                    <p>To measure this, we use the <strong>Combinational Exposure Factor (CEF)</strong>:</p>
+                    <div class="formula-box">
+                        $$ \mathrm{CEF} = \sum_{L=1}^{L_{\max}} \beta^{L-1} \sum_{c \in \mathcal{C}_L} w_c $$
+                    </div>
+                    <p>Where:</p>
+                    <ul style="font-size: 14px; margin-left: 20px; line-height: 1.6;">
+                        <li><strong>L:</strong> Chain Length (Hops).</li>
+                        <li><strong>β (1.35):</strong> The <em>Synergy Coefficient</em>. A 4-hop chain is ~2.5x harder to detect than a 2-hop chain.</li>
+                        <li><strong>w<sub>c</sub>:</strong> Chain weight based on exploitability (CVSS) and privilege.</li>
+                    </ul>
+                </div>
+
+                <!-- Slide 4: Amplification -->
+                <div class="slide" data-step="4">
+                    <h3>4. Why β = 1.35? (Amplification)</h3>
+                    <p>The "Synergy Coefficient" captures the reality of <strong>Context Loss</strong>. As a data packet moves through more tools, its original intent becomes harder to verify.</p>
+                    <table class="data-table">
+                        <thead><tr><th>Chain Length</th><th>Amplification</th><th>Example Risk</th></tr></thead>
+                        <tbody>
+                            <tr><td>2 Hops</td><td>1.35x</td><td>Direct File Read</td></tr>
+                            <tr><td>3 Hops</td><td>1.82x</td><td>DB → Slack</td></tr>
+                            <tr><td>4 Hops</td><td>2.46x</td><td>Ticket → DB → Slack</td></tr>
+                            <tr><td>5 Hops</td><td>3.32x</td><td>RCE → Pivot → Exfil</td></tr>
+                        </tbody>
+                    </table>
+                    <p>Longer chains cross trust boundaries (e.g., from "Read Only" DB to "Write" Slack), bypassing individual tool controls.</p>
+                </div>
+
+                <!-- Slide 5: Scoring Framework -->
+                <div class="slide" data-step="5">
+                    <h3>5. Weight Selection (w<sub>c</sub>)</h3>
+                    <p>Chain weights are derived from real-world exploitability, validated by Red Team exercises.</p>
+                    <div class="callout" style="border-left-color: var(--c-attack); background: rgba(239,68,68,0.1);">
+                        <strong>Formula:</strong> w<sub>c</sub> = (Exploitability × Privilege) / Controls
+                    </div>
+                    <ul style="font-size: 14px; margin-left: 20px; line-height: 1.8;">
+                        <li><strong>0.9 - 1.0 (Critical):</strong> Command Injection, Service Account Access (Root), No Logging.</li>
+                        <li><strong>0.6 - 0.8 (High):</strong> Prompt Injection, Partial Audit Trails, User-Scoped Access.</li>
+                        <li><strong>0.3 - 0.5 (Medium):</strong> Read-Only Access, Comprehensive Logging.</li>
+                    </ul>
+                </div>
+
+                <!-- Slide 6: Real World Cases -->
+                <div class="slide" data-step="6">
+                    <h3>6. Validated CVE Case Studies</h3>
+                    <p>The visualization is based on these documented incidents:</p>
+                    <table class="data-table">
+                        <thead><tr><th>CVE / Incident</th><th>Pattern</th><th>Hops</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="tag crit">CVE-2025-53109</span></td>
+                                <td>Filesystem Symlink Bypass</td>
+                                <td>3</td>
+                            </tr>
+                            <tr>
+                                <td><span class="tag crit">Supabase '25</span></td>
+                                <td>Confused Deputy (Service Role)</td>
+                                <td>4</td>
+                            </tr>
+                            <tr>
+                                <td><span class="tag crit">CVE-2025-6514</span></td>
+                                <td>mcp-remote Command Injection</td>
+                                <td>5</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p>Each additional server didn't just add a vulnerability; it completed a circuit.</p>
+                </div>
+
+                <!-- Slide 7: Defense -->
+                <div class="slide" data-step="7">
+                    <h3>7. Defense & Best Practices</h3>
+                    <p>How to use this model to secure your deployment:</p>
+                    <ol style="margin-left: 20px; line-height: 1.8; color: var(--text-secondary);">
+                        <li><strong>Calculate Your CEF:</strong> If CEF > 0.5, your deployment is statistically likely to have an unmonitored attack path.</li>
+                        <li><strong>Break the Chain:</strong> Introduce "Human-in-the-loop" at the <em>Actuator</em> level (e.g., approve Slack messages).</li>
+                        <li><strong>Monitor Context, Not Just Events:</strong> Don't just log "SQL Query". Log "SQL Query initiated by Ticket #123".</li>
+                        <li><strong>Least Privilege:</strong> Never give an AI Agent <code>service_role</code> or Admin tokens.</li>
+                    </ol>
+                    <button class="nav-btn primary" style="margin-top: 20px; width: 100%; justify-content: center;" onclick="app.toggleModal(false)">
+                        <i class="fas fa-check"></i> Return to Analyzer
+                    </button>
                 </div>
             </div>
 
-            <div class="legend-overlay">
-                <div class="legend-title">Platform Components</div>
-                <div class="legend-item">
-                    <div class="legend-icon" style="background: #3B82F6; color: white;">
-                        <i class="fas fa-database platform-icon"></i>
-                    </div>
-                    Data Sources
+            <div class="modal-footer">
+                <div class="pagination-dots" id="modal-dots">
+                    <!-- Injected via JS -->
                 </div>
-                <div class="legend-item">
-                    <div class="legend-icon" style="background: #10B981; color: white;">
-                        <i class="fas fa-cogs platform-icon"></i>
-                    </div>
-                    Processing Tools
-                </div>
-                <div class="legend-item">
-                    <div class="legend-icon" style="background: #F59E0B; color: white;">
-                        <i class="fas fa-share-alt platform-icon"></i>
-                    </div>
-                    Actuators
-                </div>
-                <div class="legend-item">
-                    <div class="legend-icon" style="background: #EF4444; color: white;">
-                        <i class="fas fa-exclamation-triangle platform-icon"></i>
-                    </div>
-                    Attack Path
+                <div style="display: flex; gap: 10px;">
+                    <button class="nav-btn" id="modal-prev" onclick="app.modalPrev()">Previous</button>
+                    <button class="nav-btn primary" id="modal-next" onclick="app.modalNext()">Next</button>
                 </div>
             </div>
-
-            <div class="risk-metrics">
-                <h4>Risk Progression</h4>
-                <div class="risk-item">
-                    <span>1 MCP:</span>
-                    <span class="risk-low">9%</span>
-                </div>
-                <div class="risk-item">
-                    <span>3 MCPs:</span>
-                    <span class="risk-medium">52%</span>
-                </div>
-                <div class="risk-item">
-                    <span>10 MCPs:</span>
-                    <span class="risk-high">92%</span>
-                </div>
-                <hr style="margin: 10px 0; border-color: #374151;">
-                <div class="risk-item">
-                    <span>Current CEF:</span>
-                    <span id="currentCEF" class="risk-medium">0.52</span>
-                </div>
-            </div>
-
-            <div class="attack-indicator" id="attackIndicator">
-                <h4 style="color: #EF4444; margin-bottom: 10px;">🚨 Active Attack Chain</h4>
-                <div style="font-family: 'Courier New', monospace; font-size: 11px;">
-                    <div><strong>Vector:</strong> Prompt injection via incident files</div>
-                    <div><strong>Path:</strong> PostgreSQL → File Parser → ServiceNow → Slack</div>
-                    <div><strong>Impact:</strong> Data exfiltration through legitimate channels</div>
-                    <div><strong>Probability:</strong> w<sub>c</sub> = 0.89</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="controls">
-            <button class="btn" onclick="showNormalFlow()">Normal Operations</button>
-            <button class="btn danger" onclick="highlightAttackChain()">Show Attack Chain</button>
-            <button class="btn" onclick="resetVisualization()">Reset</button>
-        </div>
-
-        <div class="figure-caption">
-            <strong>Figure 1:</strong> Compositional risk visualization of a typical enterprise MCP deployment showing data sources (PostgreSQL, file systems), processing tools (parsers, formatters), and actuators (ServiceNow, Slack, email). The attack chain (highlighted in red) demonstrates how prompt injection can traverse legitimate business processes to exfiltrate sensitive data. The Combinational Exposure Factor (CEF) quantifies how risk amplifies super-linearly as additional MCP servers are integrated, moving from 9% risk with a single server to 92% with ten servers. Mathematical modeling shows this progression follows $R = 1 - (1-p)^N$ where $p$ is the base per-chain compromise probability and $N$ is the number of viable attack chains.
         </div>
     </div>
 
     <script>
-        // Enterprise platform data with real icons
-        var nodes = new vis.DataSet([
-            // Data Sources with real platform icons
-            {
-                id: 1, 
-                label: 'PostgreSQL\nCustomer DB', 
-                shape: 'box',
-                color: {background: '#3B82F6', border: '#2563EB'},
-                font: {color: 'white', size: 12},
-                icon: {face: 'FontAwesome', code: '\uf1c0', size: 30, color: 'white'},
-                group: 'datasource'
-            },
-            {
-                id: 2, 
-                label: 'File System\nIncident Reports', 
-                shape: 'box',
-                color: {background: '#3B82F6', border: '#2563EB'},
-                font: {color: 'white', size: 12},
-                icon: {face: 'FontAwesome', code: '\uf07b', size: 30, color: 'white'},
-                group: 'datasource'
-            },
-            {
-                id: 3, 
-                label: 'GitHub\nRepositories', 
-                shape: 'box',
-                color: {background: '#3B82F6', border: '#2563EB'},
-                font: {color: 'white', size: 12},
-                icon: {face: 'FontAwesome', code: '\uf09b', size: 30, color: 'white'},
-                group: 'datasource'
-            },
-
-            // Processing Tools
-            {
-                id: 4, 
-                label: 'File Parser\n(Vulnerable)', 
-                shape: 'ellipse',
-                color: {background: '#10B981', border: '#059669'},
-                font: {color: 'white', size: 12},
-                icon: {face: 'FontAwesome', code: '\uf1c9', size: 25, color: 'white'},
-                group: 'tool'
-            },
-            {
-                id: 5, 
-                label: 'Data Formatter', 
-                shape: 'ellipse',
-                color: {background: '#10B981', border: '#059669'},
-                font: {color: 'white', size: 12},
-                icon: {face: 'FontAwesome', code: '\uf0ce', size: 25, color: 'white'},
-                group: 'tool'
-            },
-            {
-                id: 6, 
-                label: 'Query Engine', 
-                shape: 'ellipse',
-                color: {background: '#10B981', border: '#059669'},
-                font: {color: 'white', size: 12},
-                icon: {face: 'FontAwesome', code: '\uf002', size: 25, color: 'white'},
-                group: 'tool'
-            },
-
-            // Actuators with real platform icons
-            {
-                id: 7, 
-                label: 'ServiceNow\nTicketing', 
-                shape: 'triangle',
-                color: {background: '#F59E0B', border: '#D97706'},
-                font: {color: 'white', size: 12},
-                icon: {face: 'FontAwesome', code: '\uf3ed', size: 25, color: 'white'},
-                group: 'actuator'
-            },
-            {
-                id: 8, 
-                label: 'Slack\nNotifications', 
-                shape: 'triangle',
-                color: {background: '#F59E0B', border: '#D97706'},
-                font: {color: 'white', size: 12},
-                icon: {face: 'FontAwesome', code: '\uf198', size: 25, color: 'white'},
-                group: 'actuator'
-            },
-            {
-                id: 9, 
-                label: 'Email\nSystem', 
-                shape: 'triangle',
-                color: {background: '#F59E0B', border: '#D97706'},
-                font: {color: 'white', size: 12},
-                icon: {face: 'FontAwesome', code: '\uf0e0', size: 25, color: 'white'},
-                group: 'actuator'
-            }
-        ]);
-
-        var edges = new vis.DataSet([
-            // Data flows with labels
-            {id: 'e1', from: 1, to: 6, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'query'},
-            {id: 'e2', from: 2, to: 4, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'read'},
-            {id: 'e3', from: 3, to: 4, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'clone'},
-            
-            // Processing flows
-            {id: 'e4', from: 4, to: 5, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'parse'},
-            {id: 'e5', from: 6, to: 5, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'format'},
-            
-            // Output flows
-            {id: 'e6', from: 5, to: 7, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'create'},
-            {id: 'e7', from: 7, to: 8, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'notify'},
-            {id: 'e8', from: 5, to: 9, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'send'},
-            
-            // Cross connections
-            {id: 'e9', from: 6, to: 7, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'log'},
-            {id: 'e10', from: 4, to: 7, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'report'}
-        ]);
-
-        // Network configuration
-        var options = {
-            layout: {
-                hierarchical: {
-                    direction: 'LR',
-                    sortMethod: 'directed',
-                    levelSeparation: 200,
-                    nodeSpacing: 120
-                }
-            },
-            physics: {enabled: false},
-            edges: {
-                arrows: 'to',
-                smooth: {type: 'cubicBezier', forceDirection: 'horizontal'},
-                labelHighlightBold: true,
-                font: {size: 10, color: '#94A3B8'}
-            },
-            nodes: {
-                margin: 15,
-                widthConstraint: {maximum: 120},
-                font: {face: 'Arial', vadjust: -5}
-            },
-            interaction: {hover: true, selectConnectedEdges: false}
+        /**
+         * CONSTANTS & CONFIG
+         */
+        const COLORS = {
+            agent: '#a855f7',
+            data: '#3b82f6',
+            tool: '#10b981',
+            actuator: '#f97316',
+            attack: '#ef4444',
+            text: '#f8fafc',
+            dim: '#334155'
         };
 
-        // Initialize network
-        var container = document.getElementById('mcpNetwork');
-        var data = {nodes: nodes, edges: edges};
-        var network = new vis.Network(container, data, options);
+        const ICONS = {
+            agent: { code: '\uf544', face: '"Font Awesome 6 Free"' },     // Robot
+            db:    { code: '\uf1c0', face: '"Font Awesome 6 Free"' },     // Database
+            file:  { code: '\uf07b', face: '"Font Awesome 6 Free"' },     // Folder
+            slack: { code: '\uf198', face: '"Font Awesome 6 Brands"' },   // Slack (Brand)
+            github:{ code: '\uf09b', face: '"Font Awesome 6 Brands"' },   // GitHub (Brand)
+            ticket:{ code: '\uf3cd', face: '"Font Awesome 6 Free"' },     // Ticket
+            email: { code: '\uf0e0', face: '"Font Awesome 6 Free"' },     // Email
+            search:{ code: '\uf002', face: '"Font Awesome 6 Free"' },     // Search
+            globe: { code: '\uf0ac', face: '"Font Awesome 6 Free"' },     // Web
+            format:{ code: '\uf0db', face: '"Font Awesome 6 Free"' },     // Columns
+            output:{ code: '\uf086', face: '"Font Awesome 6 Free"' }      // Comment
+        };
 
-        // Store original styles
-        var originalNodeColors = {};
-        var originalEdgeColors = {};
-        
-        nodes.forEach(node => {
-            originalNodeColors[node.id] = node.color;
-        });
-        
-        edges.forEach(edge => {
-            originalEdgeColors[edge.id] = edge.color;
-        });
+        const MATH = {
+            beta: 1.35,       // Synergy Coefficient
+            base_prob: 0.09   // Base probability of single component failure
+        };
 
-        // Attack chain: File System → File Parser → Data Formatter → ServiceNow → Slack
-        var attackChainNodes = [2, 4, 5, 7, 8];
-        var attackChainEdges = ['e2', 'e4', 'e6', 'e7'];
+        const BASE_ICON_STYLE = { size: 45, color: COLORS.text, weight: 'bold' };
 
-        function highlightAttackChain() {
-            resetVisualization();
-            
-            // Highlight attack nodes
-            attackChainNodes.forEach(nodeId => {
-                nodes.update({
-                    id: nodeId,
-                    color: {background: '#EF4444', border: '#DC2626'},
-                    borderWidth: 3
+        /**
+         * DATA: SCENARIOS & TOPOLOGIES
+         */
+        const SCENARIOS = {
+            1: {
+                id: 1,
+                nodes: [
+                    { id: 0, label: 'AI Agent', group: 'agent', icon: ICONS.agent, tip: 'Central Orchestrator' },
+                    { id: 1, label: 'Filesystem', group: 'data', icon: ICONS.file, tip: 'Read/Write Access to Host FS' },
+                    { id: 99, label: 'Model Output', group: 'actuator', icon: ICONS.output, tip: 'Direct User Response Channel' }
+                ],
+                edges: [
+                    { from: 0, to: 1, dashed: true },
+                    { from: 0, to: 99, dashed: true },
+                    { from: 1, to: 99, id: 'atk1' }
+                ],
+                attack: {
+                    cve: 'CVE-2025-53109',
+                    title: 'Filesystem Symlink Bypass',
+                    desc: 'Vulnerability in Filesystem MCP. Attacker uses symlinks to escape sandbox, reading ~/.aws/credentials. The "Actuator" here is simply the model responding to the user with the secrets.',
+                    path: [1, 0, 99],
+                    edges: ['atk1'],
+                    steps: ['Filesystem', 'Symlink', 'Context', 'Exfiltration']
+                },
+                metrics: { chains: 1, paths: [{ len: 2, w: 0.09 }] }
+            },
+            3: {
+                id: 3,
+                nodes: [
+                    { id: 0, label: 'AI Agent', group: 'agent', icon: ICONS.agent, tip: 'Central Orchestrator' },
+                    { id: 10, label: 'ServiceNow', group: 'data', icon: ICONS.ticket, tip: 'Ticket Ingestion' },
+                    { id: 11, label: 'Supabase', group: 'data', icon: ICONS.db, tip: 'Vulnerable: service_role key' },
+                    { id: 12, label: 'Slack', group: 'actuator', icon: ICONS.slack, tip: 'External Comms' },
+                    { id: 13, label: 'SQL Engine', group: 'tool', icon: ICONS.search, tip: 'Query Execution' }
+                ],
+                edges: [
+                    { from: 0, to: 10 }, { from: 0, to: 11 }, { from: 0, to: 12 }, { from: 0, to: 13 },
+                    { from: 10, to: 11, id: 'atk1' }, 
+                    { from: 11, to: 13, id: 'atk2' }, 
+                    { from: 13, to: 12, id: 'atk3' }, 
+                ],
+                attack: {
+                    cve: 'PSA-2025-001 (Simulated)',
+                    title: 'Confused Deputy (Service Role)',
+                    desc: 'Attacker injects prompts into a ServiceNow ticket. Agent uses Supabase service_role to query DB (bypassing RLS) based on ticket data, then exfiltrates via Slack.',
+                    path: [10, 11, 13, 12],
+                    edges: ['atk1', 'atk2', 'atk3'],
+                    steps: ['Ticket(Input)', 'Supabase(Root)', 'SQL', 'Slack(Exfil)']
+                },
+                metrics: { chains: 8, paths: Array(8).fill({ len: 3, w: 0.09 }) }
+            },
+            6: {
+                id: 6,
+                nodes: [
+                    { id: 0, label: 'AI Agent', group: 'agent', icon: ICONS.agent, tip: 'Central Orchestrator' },
+                    { id: 20, label: 'mcp-remote', group: 'tool', icon: ICONS.globe, tip: 'Vulnerable: RCE (CVE-2025-6514)' },
+                    { id: 21, label: 'GitHub', group: 'data', icon: ICONS.github, tip: 'Source Code & Creds' },
+                    { id: 22, label: 'SQL Engine', group: 'tool', icon: ICONS.search, tip: 'Internal DB Access' },
+                    { id: 23, label: 'Formatter', group: 'tool', icon: ICONS.format, tip: 'Data Transformation' },
+                    { id: 24, label: 'ServiceNow', group: 'actuator', icon: ICONS.ticket, tip: 'Ticketing System' },
+                    { id: 25, label: 'Slack', group: 'actuator', icon: ICONS.slack, tip: 'Alert Channel' },
+                    { id: 26, label: 'Email', group: 'actuator', icon: ICONS.email, tip: 'SMTP Gateway' }
+                ],
+                edges: [
+                    { from: 0, to: 20 }, { from: 0, to: 21 }, { from: 0, to: 22 }, { from: 0, to: 23 }, { from: 0, to: 24 }, { from: 0, to: 25 },
+                    { from: 20, to: 21, id: 'atk1' },
+                    { from: 21, to: 22, id: 'atk2' },
+                    { from: 22, to: 23, id: 'atk3' },
+                    { from: 23, to: 24, id: 'atk4' },
+                    { from: 24, to: 25, id: 'atk5' },
+                    { from: 22, to: 26 }
+                ],
+                attack: {
+                    cve: 'CVE-2025-6514',
+                    title: 'Complex RCE Pipeline',
+                    desc: 'RCE in mcp-remote provides initial foothold. Attacker harvests GitHub creds to access SQL DB. Data is formatted to look like a log report, created as a ServiceNow ticket, and linked in Slack to exfiltrate without direct outbound network calls.',
+                    path: [20, 21, 22, 23, 24, 25],
+                    edges: ['atk1', 'atk2', 'atk3', 'atk4', 'atk5'],
+                    steps: ['RCE', 'GitHub', 'SQL', 'Format', 'Ticket', 'Slack']
+                },
+                metrics: { chains: 27, paths: Array(27).fill({ len: 5, w: 0.09 }) }
+            }
+        };
+
+        /**
+         * APP CONTROLLER
+         */
+        const app = {
+            network: null,
+            scenarioId: 1,
+            isAttackMode: false,
+            currentSlide: 1,
+            totalSlides: 7,
+
+            init: function() {
+                if (document.fonts) {
+                    document.fonts.ready.then(() => this.initVis()).catch(() => this.initVis());
+                } else {
+                    this.initVis();
+                }
+                this.initDots();
+            },
+
+            initVis: function() {
+                if (this.network) return;
+
+                const container = document.getElementById('network-viz');
+                const tooltip = document.getElementById('custom-tooltip');
+
+                this.network = new vis.Network(container, {}, {
+                    nodes: {
+                        shape: 'icon',
+                        icon: BASE_ICON_STYLE,
+                        font: { color: COLORS.text, size: 14, face: 'Inter', strokeWidth: 0, strokeColor: '#000' },
+                        borderWidth: 2,
+                        shadow: true
+                    },
+                    edges: {
+                        width: 2,
+                        color: { color: COLORS.dim, highlight: COLORS.text },
+                        arrows: { to: { enabled: true, scaleFactor: 1 } },
+                        smooth: { type: 'curvedCW', roundness: 0.2 }
+                    },
+                    physics: {
+                        stabilization: false,
+                        barnesHut: { gravitationalConstant: -6000, springConstant: 0.04, springLength: 150 }
+                    },
+                    interaction: { hover: true, zoomView: true }
                 });
-            });
-            
-            // Highlight attack edges
-            attackChainEdges.forEach(edgeId => {
-                edges.update({
-                    id: edgeId,
-                    color: {color: '#EF4444'},
-                    width: 4
-                });
-            });
-            
-            // Update metrics
-            document.getElementById('currentCEF').textContent = '0.89';
-            document.getElementById('currentCEF').className = 'risk-high';
-            
-            // Show attack indicator
-            document.getElementById('attackIndicator').classList.add('active');
-            
-            // Animate progression
-            animateAttack();
-        }
 
-        function animateAttack() {
-            let step = 0;
-            const interval = setInterval(() => {
-                if (step < attackChainNodes.length) {
-                    const nodeId = attackChainNodes[step];
-                    nodes.update({
-                        id: nodeId,
-                        color: {background: '#FCA5A5', border: '#EF4444'},
-                        borderWidth: 5
+                this.network.on("hoverNode", function (params) {
+                    const nodeId = params.node;
+                    const nodeData = SCENARIOS[app.scenarioId].nodes.find(n => n.id === nodeId);
+                    if (nodeData) {
+                        const domCoords = app.network.canvasToDOM(app.network.getPositions([nodeId])[nodeId]);
+                        tooltip.style.display = 'block';
+                        tooltip.style.left = (domCoords.x + 20) + 'px';
+                        tooltip.style.top = (domCoords.y - 20) + 'px';
+                        tooltip.innerHTML = `<h4>${nodeData.label}</h4><p>${nodeData.tip}</p>`;
+                    }
+                });
+
+                this.network.on("blurNode", function (params) {
+                    tooltip.style.display = 'none';
+                });
+
+                this.loadScenario(1);
+            },
+
+            loadScenario: function(id) {
+                this.scenarioId = id;
+                this.isAttackMode = false;
+                this.updateUI(id);
+                
+                const data = SCENARIOS[id];
+                
+                const visNodes = data.nodes.map(n => {
+                    let color = COLORS.agent;
+                    if(n.group === 'data') color = COLORS.data;
+                    if(n.group === 'tool') color = COLORS.tool;
+                    if(n.group === 'actuator') color = COLORS.actuator;
+
+                    return {
+                        ...n,
+                        icon: { 
+                            ...BASE_ICON_STYLE, 
+                            code: n.icon.code,
+                            face: n.icon.face,
+                            color: color 
+                        },
+                        color: color
+                    };
+                });
+
+                this.network.setData({
+                    nodes: new vis.DataSet(visNodes),
+                    edges: new vis.DataSet(data.edges)
+                });
+
+                this.network.once('afterDrawing', () => {
+                    const agentId = 0;
+                    this.network.moveNode(agentId, 0, 0);
+
+                    const others = data.nodes.filter(n => n.id !== 0);
+                    const radius = id === 6 ? 280 : 200;
+                    const step = (2 * Math.PI) / others.length;
+
+                    others.forEach((n, i) => {
+                        const angle = i * step - (Math.PI / 2);
+                        this.network.moveNode(n.id, radius * Math.cos(angle), radius * Math.sin(angle));
                     });
                     
-                    setTimeout(() => {
-                        nodes.update({
-                            id: nodeId,
-                            color: {background: '#EF4444', border: '#DC2626'},
-                            borderWidth: 3
-                        });
-                    }, 500);
+                    this.network.fit({ animation: { duration: 1000 } });
+                });
+
+                this.calculateMetrics(data.metrics);
+            },
+
+            toggleAttack: function() {
+                this.isAttackMode = !this.isAttackMode;
+                const btn = document.getElementById('btn-attack');
+                const card = document.getElementById('attack-card');
+                const data = SCENARIOS[this.scenarioId].attack;
+
+                if (this.isAttackMode) {
+                    btn.classList.add('active');
+                    card.classList.add('visible');
                     
-                    step++;
+                    const allNodes = this.network.body.data.nodes.getIds();
+                    const allEdges = this.network.body.data.edges.getIds();
+
+                    // Dim everything
+                    this.network.body.data.nodes.update(allNodes.map(id => ({ id, opacity: 0.2, icon: { color: COLORS.dim } })));
+                    this.network.body.data.edges.update(allEdges.map(id => ({ id, color: { color: COLORS.dim, opacity: 0.05 }, width: 1 })));
+
+                    // Highlight attack
+                    this.network.body.data.nodes.update(data.path.map(id => ({ id, opacity: 1, icon: { color: COLORS.attack } })));
+                    this.network.body.data.edges.update(data.edges.map(id => ({ id, color: { color: COLORS.attack }, width: 4, dashes: false })));
+
+                    // Fill Card
+                    document.getElementById('ac-cve').innerText = data.cve;
+                    document.getElementById('ac-desc').innerText = data.desc;
+                    document.getElementById('ac-steps').innerHTML = data.steps.map(s => `<span>${s}</span>`).join('<span class="step-arrow">→</span>');
+                    
+                    const chainLen = data.steps.length;
+                    const ampWeight = (0.09 * Math.pow(MATH.beta, chainLen - 1)).toFixed(3);
+                    document.getElementById('ac-len').innerText = chainLen;
+                    document.getElementById('ac-weight').innerText = ampWeight;
+
                 } else {
-                    clearInterval(interval);
+                    btn.classList.remove('active');
+                    card.classList.remove('visible');
+                    this.loadScenario(this.scenarioId);
                 }
-            }, 800);
-        }
+            },
 
-        function showNormalFlow() {
-            resetVisualization();
-            
-            // Highlight normal path: PostgreSQL → Query → Formatter → Email
-            const normalNodes = [1, 6, 5, 9];
-            const normalEdges = ['e1', 'e5', 'e8'];
-            
-            normalNodes.forEach(nodeId => {
-                nodes.update({
-                    id: nodeId,
-                    color: {background: '#10B981', border: '#059669'},
-                    borderWidth: 2
+            calculateMetrics: function(metrics) {
+                let cef = 0;
+                metrics.paths.forEach(p => {
+                    cef += Math.pow(MATH.beta, p.len - 1) * p.w;
                 });
-            });
-            
-            normalEdges.forEach(edgeId => {
-                edges.update({
-                    id: edgeId,
-                    color: {color: '#10B981'},
-                    width: 3
-                });
-            });
-            
-            document.getElementById('currentCEF').textContent = '0.15';
-            document.getElementById('currentCEF').className = 'risk-low';
-        }
+                const risk = 1 - Math.pow(1 - MATH.base_prob, metrics.chains);
 
-        function resetVisualization() {
-            // Reset all nodes
-            nodes.forEach(node => {
-                nodes.update({
-                    id: node.id,
-                    color: originalNodeColors[node.id],
-                    borderWidth: 1
-                });
-            });
-            
-            // Reset all edges
-            edges.forEach(edge => {
-                edges.update({
-                    id: edge.id,
-                    color: originalEdgeColors[edge.id],
-                    width: 2
-                });
-            });
-            
-            document.getElementById('currentCEF').textContent = '0.52';
-            document.getElementById('currentCEF').className = 'risk-medium';
-            document.getElementById('attackIndicator').classList.remove('active');
-        }
+                this.animateValue('ui-chains', metrics.chains);
+                document.getElementById('ui-cef').innerText = cef.toFixed(2);
+                document.getElementById('ui-risk').innerText = (risk * 100).toFixed(0) + '%';
+            },
 
-        // Initialize with normal flow
-        setTimeout(() => showNormalFlow(), 1000);
+            updateUI: function(id) {
+                document.querySelectorAll('.btn-scenario').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.btn-scenario')[id === 1 ? 0 : id === 3 ? 1 : 2].classList.add('active');
+                document.getElementById('attack-card').classList.remove('visible');
+                document.getElementById('btn-attack').classList.remove('active');
+            },
+
+            animateValue: function(id, end) {
+                const obj = document.getElementById(id);
+                const start = parseInt(obj.innerText);
+                if(start === end) return;
+                let current = start;
+                const step = end > start ? 1 : -1;
+                const timer = setInterval(() => {
+                    current += step;
+                    obj.innerText = current;
+                    if (current === end) clearInterval(timer);
+                }, 50);
+            },
+
+            /* MODAL / SLIDESHOW LOGIC */
+            toggleModal: function(show) {
+                const modal = document.getElementById('modal-methodology');
+                modal.classList.toggle('open', show);
+                if(show) this.goToSlide(1);
+            },
+
+            initDots: function() {
+                const container = document.getElementById('modal-dots');
+                let html = '';
+                for(let i=1; i<=this.totalSlides; i++) {
+                    html += `<div class="dot-nav ${i===1?'active':''}" id="dot-${i}"></div>`;
+                }
+                container.innerHTML = html;
+            },
+
+            goToSlide: function(n) {
+                // Hide current
+                const slides = document.querySelectorAll('.slide');
+                slides.forEach(s => s.classList.remove('active'));
+                
+                // Show new
+                const newSlide = document.querySelector(`.slide[data-step="${n}"]`);
+                if(newSlide) newSlide.classList.add('active');
+
+                // Update state
+                this.currentSlide = n;
+                
+                // Update controls
+                document.getElementById('modal-prev').disabled = (n === 1);
+                const nextBtn = document.getElementById('modal-next');
+                if(n === this.totalSlides) {
+                    nextBtn.innerText = 'Close';
+                    nextBtn.onclick = () => this.toggleModal(false);
+                } else {
+                    nextBtn.innerText = 'Next';
+                    nextBtn.onclick = () => this.modalNext();
+                }
+
+                // Update Dots
+                document.querySelectorAll('.dot-nav').forEach((d, i) => {
+                    d.classList.toggle('active', i + 1 === n);
+                });
+            },
+
+            modalNext: function() {
+                if(this.currentSlide < this.totalSlides) this.goToSlide(this.currentSlide + 1);
+            },
+
+            modalPrev: function() {
+                if(this.currentSlide > 1) this.goToSlide(this.currentSlide - 1);
+            }
+        };
+
+        window.onload = () => app.init();
     </script>
 </body>
 </html>
