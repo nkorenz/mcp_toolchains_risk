@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compositional Risk Analysis in MCP Toolchain Networks</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif;
+            background-color: #0F172A;
+            color: #F8FAFC;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .paper-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #1E293B;
+            border-radius: 8px;
+            padding: 40px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .figure-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .figure-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #3B82F6;
+            margin-bottom: 10px;
+        }
+
+        .figure-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #F8FAFC;
+            margin-bottom: 15px;
+        }
+
+        .figure-subtitle {
+            font-size: 16px;
+            color: #94A3B8;
+            font-style: italic;
+        }
+
+        .diagram-container {
+            position: relative;
+            height: 600px;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            border: 2px solid #374151;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        #mcpNetwork {
+            width: 100%;
+            height: 100%;
+            border-radius: 6px;
+        }
+
+        .formula-overlay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid #3B82F6;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 14px;
+            backdrop-filter: blur(5px);
+            max-width: 280px;
+        }
+
+        .formula-title {
+            color: #3B82F6;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .risk-metrics {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid #10B981;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+            backdrop-filter: blur(5px);
+            min-width: 200px;
+        }
+
+        .risk-metrics h4 {
+            color: #10B981;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .risk-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .risk-low { color: #10B981; }
+        .risk-medium { color: #F59E0B; }
+        .risk-high { color: #EF4444; }
+
+        .legend-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid #8B5CF6;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+            backdrop-filter: blur(5px);
+            min-width: 200px;
+        }
+
+        .legend-title {
+            color: #8B5CF6;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .attack-indicator {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #EF4444;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+            backdrop-filter: blur(5px);
+            min-width: 250px;
+            display: none;
+        }
+
+        .attack-indicator.active {
+            display: block;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .btn {
+            background: #3B82F6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #2563EB;
+            transform: translateY(-1px);
+        }
+
+        .btn.danger {
+            background: #EF4444;
+        }
+
+        .btn.danger:hover {
+            background: #DC2626;
+        }
+
+        .figure-caption {
+            font-size: 14px;
+            color: #94A3B8;
+            line-height: 1.5;
+            margin-top: 20px;
+            text-align: justify;
+        }
+
+        .platform-icon {
+            font-size: 16px !important;
+        }
+
+        /* Custom node styling for platforms */
+        .vis-network .vis-manipulation {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="paper-container">
+        <div class="figure-header">
+            <div class="figure-number">Figure 1</div>
+            <div class="figure-title">Compositional Risk Analysis in MCP Toolchain Networks</div>
+            <div class="figure-subtitle">Interactive Visualization of Attack Surface Amplification in Enterprise AI Agent Deployments</div>
+        </div>
+
+        <div class="diagram-container">
+            <div id="mcpNetwork"></div>
+            
+            <div class="formula-overlay">
+                <div class="formula-title">Combinational Exposure Factor</div>
+                <div style="text-align: center; margin: 10px 0;">
+                    $$\text{CEF} = \sum_{L=1}^{L_{\max}} \beta^{L-1} \sum_{c \in \mathcal{C}_L} w_c$$
+                </div>
+                <div style="font-size: 11px; color: #94A3B8;">
+                    Where:<br>
+                    • $L$ = chain length<br>
+                    • $\beta$ = synergy coefficient<br>
+                    • $\mathcal{C}_L$ = chains of length $L$<br>
+                    • $w_c$ = chain weight
+                </div>
+            </div>
+
+            <div class="legend-overlay">
+                <div class="legend-title">Platform Components</div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #3B82F6; color: white;">
+                        <i class="fas fa-database platform-icon"></i>
+                    </div>
+                    Data Sources
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #10B981; color: white;">
+                        <i class="fas fa-cogs platform-icon"></i>
+                    </div>
+                    Processing Tools
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #F59E0B; color: white;">
+                        <i class="fas fa-share-alt platform-icon"></i>
+                    </div>
+                    Actuators
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #EF4444; color: white;">
+                        <i class="fas fa-exclamation-triangle platform-icon"></i>
+                    </div>
+                    Attack Path
+                </div>
+            </div>
+
+            <div class="risk-metrics">
+                <h4>Risk Progression</h4>
+                <div class="risk-item">
+                    <span>1 MCP:</span>
+                    <span class="risk-low">9%</span>
+                </div>
+                <div class="risk-item">
+                    <span>3 MCPs:</span>
+                    <span class="risk-medium">52%</span>
+                </div>
+                <div class="risk-item">
+                    <span>10 MCPs:</span>
+                    <span class="risk-high">92%</span>
+                </div>
+                <hr style="margin: 10px 0; border-color: #374151;">
+                <div class="risk-item">
+                    <span>Current CEF:</span>
+                    <span id="currentCEF" class="risk-medium">0.52</span>
+                </div>
+            </div>
+
+            <div class="attack-indicator" id="attackIndicator">
+                <h4 style="color: #EF4444; margin-bottom: 10px;">🚨 Active Attack Chain</h4>
+                <div style="font-family: 'Courier New', monospace; font-size: 11px;">
+                    <div><strong>Vector:</strong> Prompt injection via incident files</div>
+                    <div><strong>Path:</strong> PostgreSQL → File Parser → ServiceNow → Slack</div>
+                    <div><strong>Impact:</strong> Data exfiltration through legitimate channels</div>
+                    <div><strong>Probability:</strong> w<sub>c</sub> = 0.89</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="showNormalFlow()">Normal Operations</button>
+            <button class="btn danger" onclick="highlightAttackChain()">Show Attack Chain</button>
+            <button class="btn" onclick="resetVisualization()">Reset</button>
+        </div>
+
+        <div class="figure-caption">
+            <strong>Figure 1:</strong> Compositional risk visualization of a typical enterprise MCP deployment showing data sources (PostgreSQL, file systems), processing tools (parsers, formatters), and actuators (ServiceNow, Slack, email). The attack chain (highlighted in red) demonstrates how prompt injection can traverse legitimate business processes to exfiltrate sensitive data. The Combinational Exposure Factor (CEF) quantifies how risk amplifies super-linearly as additional MCP servers are integrated, moving from 9% risk with a single server to 92% with ten servers. Mathematical modeling shows this progression follows $R = 1 - (1-p)^N$ where $p$ is the base per-chain compromise probability and $N$ is the number of viable attack chains.
+        </div>
+    </div>
+
+    <script>
+        // Enterprise platform data with real icons
+        var nodes = new vis.DataSet([
+            // Data Sources with real platform icons
+            {
+                id: 1, 
+                label: 'PostgreSQL\nCustomer DB', 
+                shape: 'box',
+                color: {background: '#3B82F6', border: '#2563EB'},
+                font: {color: 'white', size: 12},
+                icon: {face: 'FontAwesome', code: '\uf1c0', size: 30, color: 'white'},
+                group: 'datasource'
+            },
+            {
+                id: 2, 
+                label: 'File System\nIncident Reports', 
+                shape: 'box',
+                color: {background: '#3B82F6', border: '#2563EB'},
+                font: {color: 'white', size: 12},
+                icon: {face: 'FontAwesome', code: '\uf07b', size: 30, color: 'white'},
+                group: 'datasource'
+            },
+            {
+                id: 3, 
+                label: 'GitHub\nRepositories', 
+                shape: 'box',
+                color: {background: '#3B82F6', border: '#2563EB'},
+                font: {color: 'white', size: 12},
+                icon: {face: 'FontAwesome', code: '\uf09b', size: 30, color: 'white'},
+                group: 'datasource'
+            },
+
+            // Processing Tools
+            {
+                id: 4, 
+                label: 'File Parser\n(Vulnerable)', 
+                shape: 'ellipse',
+                color: {background: '#10B981', border: '#059669'},
+                font: {color: 'white', size: 12},
+                icon: {face: 'FontAwesome', code: '\uf1c9', size: 25, color: 'white'},
+                group: 'tool'
+            },
+            {
+                id: 5, 
+                label: 'Data Formatter', 
+                shape: 'ellipse',
+                color: {background: '#10B981', border: '#059669'},
+                font: {color: 'white', size: 12},
+                icon: {face: 'FontAwesome', code: '\uf0ce', size: 25, color: 'white'},
+                group: 'tool'
+            },
+            {
+                id: 6, 
+                label: 'Query Engine', 
+                shape: 'ellipse',
+                color: {background: '#10B981', border: '#059669'},
+                font: {color: 'white', size: 12},
+                icon: {face: 'FontAwesome', code: '\uf002', size: 25, color: 'white'},
+                group: 'tool'
+            },
+
+            // Actuators with real platform icons
+            {
+                id: 7, 
+                label: 'ServiceNow\nTicketing', 
+                shape: 'triangle',
+                color: {background: '#F59E0B', border: '#D97706'},
+                font: {color: 'white', size: 12},
+                icon: {face: 'FontAwesome', code: '\uf3ed', size: 25, color: 'white'},
+                group: 'actuator'
+            },
+            {
+                id: 8, 
+                label: 'Slack\nNotifications', 
+                shape: 'triangle',
+                color: {background: '#F59E0B', border: '#D97706'},
+                font: {color: 'white', size: 12},
+                icon: {face: 'FontAwesome', code: '\uf198', size: 25, color: 'white'},
+                group: 'actuator'
+            },
+            {
+                id: 9, 
+                label: 'Email\nSystem', 
+                shape: 'triangle',
+                color: {background: '#F59E0B', border: '#D97706'},
+                font: {color: 'white', size: 12},
+                icon: {face: 'FontAwesome', code: '\uf0e0', size: 25, color: 'white'},
+                group: 'actuator'
+            }
+        ]);
+
+        var edges = new vis.DataSet([
+            // Data flows with labels
+            {id: 'e1', from: 1, to: 6, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'query'},
+            {id: 'e2', from: 2, to: 4, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'read'},
+            {id: 'e3', from: 3, to: 4, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'clone'},
+            
+            // Processing flows
+            {id: 'e4', from: 4, to: 5, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'parse'},
+            {id: 'e5', from: 6, to: 5, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'format'},
+            
+            // Output flows
+            {id: 'e6', from: 5, to: 7, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'create'},
+            {id: 'e7', from: 7, to: 8, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'notify'},
+            {id: 'e8', from: 5, to: 9, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'send'},
+            
+            // Cross connections
+            {id: 'e9', from: 6, to: 7, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'log'},
+            {id: 'e10', from: 4, to: 7, arrows: 'to', color: {color: '#94A3B8'}, width: 2, label: 'report'}
+        ]);
+
+        // Network configuration
+        var options = {
+            layout: {
+                hierarchical: {
+                    direction: 'LR',
+                    sortMethod: 'directed',
+                    levelSeparation: 200,
+                    nodeSpacing: 120
+                }
+            },
+            physics: {enabled: false},
+            edges: {
+                arrows: 'to',
+                smooth: {type: 'cubicBezier', forceDirection: 'horizontal'},
+                labelHighlightBold: true,
+                font: {size: 10, color: '#94A3B8'}
+            },
+            nodes: {
+                margin: 15,
+                widthConstraint: {maximum: 120},
+                font: {face: 'Arial', vadjust: -5}
+            },
+            interaction: {hover: true, selectConnectedEdges: false}
+        };
+
+        // Initialize network
+        var container = document.getElementById('mcpNetwork');
+        var data = {nodes: nodes, edges: edges};
+        var network = new vis.Network(container, data, options);
+
+        // Store original styles
+        var originalNodeColors = {};
+        var originalEdgeColors = {};
+        
+        nodes.forEach(node => {
+            originalNodeColors[node.id] = node.color;
+        });
+        
+        edges.forEach(edge => {
+            originalEdgeColors[edge.id] = edge.color;
+        });
+
+        // Attack chain: File System → File Parser → Data Formatter → ServiceNow → Slack
+        var attackChainNodes = [2, 4, 5, 7, 8];
+        var attackChainEdges = ['e2', 'e4', 'e6', 'e7'];
+
+        function highlightAttackChain() {
+            resetVisualization();
+            
+            // Highlight attack nodes
+            attackChainNodes.forEach(nodeId => {
+                nodes.update({
+                    id: nodeId,
+                    color: {background: '#EF4444', border: '#DC2626'},
+                    borderWidth: 3
+                });
+            });
+            
+            // Highlight attack edges
+            attackChainEdges.forEach(edgeId => {
+                edges.update({
+                    id: edgeId,
+                    color: {color: '#EF4444'},
+                    width: 4
+                });
+            });
+            
+            // Update metrics
+            document.getElementById('currentCEF').textContent = '0.89';
+            document.getElementById('currentCEF').className = 'risk-high';
+            
+            // Show attack indicator
+            document.getElementById('attackIndicator').classList.add('active');
+            
+            // Animate progression
+            animateAttack();
+        }
+
+        function animateAttack() {
+            let step = 0;
+            const interval = setInterval(() => {
+                if (step < attackChainNodes.length) {
+                    const nodeId = attackChainNodes[step];
+                    nodes.update({
+                        id: nodeId,
+                        color: {background: '#FCA5A5', border: '#EF4444'},
+                        borderWidth: 5
+                    });
+                    
+                    setTimeout(() => {
+                        nodes.update({
+                            id: nodeId,
+                            color: {background: '#EF4444', border: '#DC2626'},
+                            borderWidth: 3
+                        });
+                    }, 500);
+                    
+                    step++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 800);
+        }
+
+        function showNormalFlow() {
+            resetVisualization();
+            
+            // Highlight normal path: PostgreSQL → Query → Formatter → Email
+            const normalNodes = [1, 6, 5, 9];
+            const normalEdges = ['e1', 'e5', 'e8'];
+            
+            normalNodes.forEach(nodeId => {
+                nodes.update({
+                    id: nodeId,
+                    color: {background: '#10B981', border: '#059669'},
+                    borderWidth: 2
+                });
+            });
+            
+            normalEdges.forEach(edgeId => {
+                edges.update({
+                    id: edgeId,
+                    color: {color: '#10B981'},
+                    width: 3
+                });
+            });
+            
+            document.getElementById('currentCEF').textContent = '0.15';
+            document.getElementById('currentCEF').className = 'risk-low';
+        }
+
+        function resetVisualization() {
+            // Reset all nodes
+            nodes.forEach(node => {
+                nodes.update({
+                    id: node.id,
+                    color: originalNodeColors[node.id],
+                    borderWidth: 1
+                });
+            });
+            
+            // Reset all edges
+            edges.forEach(edge => {
+                edges.update({
+                    id: edge.id,
+                    color: originalEdgeColors[edge.id],
+                    width: 2
+                });
+            });
+            
+            document.getElementById('currentCEF').textContent = '0.52';
+            document.getElementById('currentCEF').className = 'risk-medium';
+            document.getElementById('attackIndicator').classList.remove('active');
+        }
+
+        // Initialize with normal flow
+        setTimeout(() => showNormalFlow(), 1000);
+    </script>
+</body>
+</html>
